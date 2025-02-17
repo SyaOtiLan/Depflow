@@ -5,6 +5,35 @@ import subprocess
 import threading
 import math
 
+
+class FourOptionDialog(simpledialog.Dialog):
+    def body(self, master):
+        tk.Label(master, text="请选择操作:").grid(row=0, column=0, columnspan=4)
+        self.result = None
+        return None
+
+    def buttonbox(self):
+        box = tk.Frame(self)
+
+        b1 = tk.Button(box, text="选代码", width=10, command=lambda: self.ok(1))
+        b1.pack(side=tk.LEFT, padx=5, pady=5)
+        b2 = tk.Button(box, text="输入代码", width=10, command=lambda: self.ok(2))
+        b2.pack(side=tk.LEFT, padx=5, pady=5)
+        b3 = tk.Button(box, text="查看保存的代码", width=15, command=lambda: self.ok(3))
+        b3.pack(side=tk.LEFT, padx=5, pady=5)
+        b4 = tk.Button(box, text="不修改退出", width=10, command=lambda: self.ok(4))
+        b4.pack(side=tk.LEFT, padx=5, pady=5)
+
+        self.bind("<Return>", self.ok)
+        self.bind("<Escape>", self.cancel)
+
+        box.pack()
+
+    def ok(self, choice):
+        self.result = choice
+        self.destroy()
+
+
 # 全局变量
 graph = defaultdict(list)
 nodes = []
@@ -14,10 +43,13 @@ node_files = {}  # 存储每个节点对应的文件或代码
 current_dragging = None
 start_node = None
 line = None
+# 存储每条线对应的起始节点和结束节点
+node_lines = defaultdict(list)
 # 距离阈值，可根据需要调整
 DISTANCE_THRESHOLD = 100
 # 扩大的选中范围阈值
 SELECTION_THRESHOLD = 80
+
 
 # 拓扑排序函数
 def topological_sort(graph):
@@ -42,6 +74,7 @@ def topological_sort(graph):
 
     return result
 
+
 # 执行文件函数
 def execute_file(file):
     try:
@@ -55,6 +88,7 @@ def execute_file(file):
             print(f"Error executing {file}: Return code {process.returncode}")
     except Exception as e:
         print(f"Error executing {file}: {e}")
+
 
 # 执行所有文件函数
 def execute_all_files():
@@ -70,6 +104,7 @@ def execute_all_files():
     except ValueError as e:
         print(e)
 
+
 # 自定义查找在指定范围内的节点
 def find_node_in_range(x, y):
     for node in nodes:
@@ -81,18 +116,20 @@ def find_node_in_range(x, y):
             return node
     return None
 
+
 # 右键点击节点的处理函数
 def on_right_click(event):
     node = find_node_in_range(event.x, event.y)
     if node:
-        choice = tk.messagebox.askyesno("选择操作", "是否选择 Python 文件？否则输入代码")
-        if choice:
+        dialog = FourOptionDialog(root, title="选择操作")
+        choice = dialog.result
+        if choice == 1:
             file_path = filedialog.askopenfilename(filetypes=[("Python files", "*.py")])
             if file_path:
                 node_files[node] = file_path
                 node_names[node] = file_path
                 print(f"节点 {node} 关联文件: {file_path}")
-        else:
+        elif choice == 2:
             code = simpledialog.askstring("输入代码", "请输入 Python 代码：")
             if code:
                 # 这里可以将代码保存到临时文件，再执行
@@ -102,6 +139,18 @@ def on_right_click(event):
                 node_files[node] = f.name
                 node_names[node] = f.name
                 print(f"节点 {node} 关联代码文件: {f.name}")
+        elif choice == 3:
+            file = node_files.get(node)
+            if file:
+                try:
+                    with open(file, 'r') as f:
+                        code_content = f.read()
+                        print(f"节点 {node} 保存的代码内容:\n{code_content}")
+                except Exception as e:
+                    print(f"读取代码文件出错: {e}")
+            else:
+                print(f"节点 {node} 没有保存代码。")
+
 
 # 创建节点函数
 def create_node():
@@ -123,10 +172,21 @@ def create_node():
     canvas.tag_bind(new_node, "<ButtonRelease-1>", end_connect)
     canvas.tag_bind(new_node, "<ButtonPress-3>", on_right_click)  # 绑定右键点击事件
 
+
 # 开始拖动节点
 def start_drag(event):
     global current_dragging
     current_dragging = find_node_in_range(event.x, event.y)
+
+
+# 更新与节点相连的线的坐标
+def update_lines(node):
+    for line_info in node_lines[node]:
+        line_id, start_node, end_node = line_info
+        x1, y1 = canvas.coords(start_node)[0] + 25, canvas.coords(start_node)[1] + 25
+        x2, y2 = canvas.coords(end_node)[0] + 25, canvas.coords(end_node)[1] + 25
+        canvas.coords(line_id, x1, y1, x2, y2)
+
 
 # 拖动节点
 def drag(event):
@@ -137,11 +197,15 @@ def drag(event):
         # 同时移动节点标号
         label = node_labels[current_dragging]
         canvas.coords(label, x, y)
+        # 更新与当前拖动节点相连的线的坐标
+        update_lines(current_dragging)
+
 
 # 结束拖动节点
 def end_drag(event):
     global current_dragging
     current_dragging = None
+
 
 # 开始建立依赖关系
 def start_connect(event):
@@ -151,6 +215,7 @@ def start_connect(event):
         x1, y1 = canvas.coords(start_node)[0] + 25, canvas.coords(start_node)[1] + 25
         line = canvas.create_line(x1, y1, x1, y1, arrow=tk.LAST)
 
+
 # 绘制连线
 def draw_line(event):
     global line, start_node
@@ -159,9 +224,11 @@ def draw_line(event):
         x2, y2 = event.x, event.y
         canvas.coords(line, x1, y1, x2, y2)
 
+
 # 计算两点之间的距离
 def distance(x1, y1, x2, y2):
     return math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+
 
 # 结束建立依赖关系
 def end_connect(event):
@@ -186,10 +253,14 @@ def end_connect(event):
             x1, y1 = canvas.coords(start_node)[0] + 25, canvas.coords(start_node)[1] + 25
             x2, y2 = canvas.coords(closest_node)[0] + 25, canvas.coords(closest_node)[1] + 25
             canvas.coords(line, x1, y1, x2, y2)
+            # 记录线与节点的关联
+            node_lines[start_node].append([line, start_node, closest_node])
+            node_lines[closest_node].append([line, start_node, closest_node])
         else:
             canvas.delete(line)
         start_node = None
         line = None
+
 
 # 创建主窗口
 root = tk.Tk()
