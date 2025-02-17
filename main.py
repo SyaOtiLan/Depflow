@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import filedialog, simpledialog
 from collections import defaultdict
 import subprocess
 import threading
@@ -9,13 +10,14 @@ graph = defaultdict(list)
 nodes = []
 node_names = {}
 node_labels = {}
+node_files = {}  # 存储每个节点对应的文件或代码
 current_dragging = None
 start_node = None
 line = None
 # 距离阈值，可根据需要调整
-DISTANCE_THRESHOLD = 70
+DISTANCE_THRESHOLD = 100
 # 扩大的选中范围阈值
-SELECTION_THRESHOLD = 50
+SELECTION_THRESHOLD = 80
 
 # 拓扑排序函数
 def topological_sort(graph):
@@ -79,6 +81,28 @@ def find_node_in_range(x, y):
             return node
     return None
 
+# 右键点击节点的处理函数
+def on_right_click(event):
+    node = find_node_in_range(event.x, event.y)
+    if node:
+        choice = tk.messagebox.askyesno("选择操作", "是否选择 Python 文件？否则输入代码")
+        if choice:
+            file_path = filedialog.askopenfilename(filetypes=[("Python files", "*.py")])
+            if file_path:
+                node_files[node] = file_path
+                node_names[node] = file_path
+                print(f"节点 {node} 关联文件: {file_path}")
+        else:
+            code = simpledialog.askstring("输入代码", "请输入 Python 代码：")
+            if code:
+                # 这里可以将代码保存到临时文件，再执行
+                import tempfile
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+                    f.write(code)
+                node_files[node] = f.name
+                node_names[node] = f.name
+                print(f"节点 {node} 关联代码文件: {f.name}")
+
 # 创建节点函数
 def create_node():
     global nodes, node_names, node_labels
@@ -87,6 +111,7 @@ def create_node():
     new_node = canvas.create_oval(50, 50, 100, 100, fill="blue")
     nodes.append(new_node)
     node_names[new_node] = node_name
+    node_files[new_node] = None  # 初始化节点对应的文件或代码
     # 创建节点标号文本
     label = canvas.create_text(75, 75, text=str(node_id), fill="white")
     node_labels[new_node] = label
@@ -96,6 +121,7 @@ def create_node():
     canvas.tag_bind(new_node, "<ButtonPress-1>", start_connect)
     canvas.tag_bind(new_node, "<B1-Motion>", draw_line)
     canvas.tag_bind(new_node, "<ButtonRelease-1>", end_connect)
+    canvas.tag_bind(new_node, "<ButtonPress-3>", on_right_click)  # 绑定右键点击事件
 
 # 开始拖动节点
 def start_drag(event):
