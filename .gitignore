@@ -29,3 +29,12 @@ settings_local.py
 
 # Jupyter Notebook 相关
 .ipynb_checkpoints/
+
+script1.py
+script2.py
+script3.py
+script4.py
+
+output.txt
+
+tmp.py
