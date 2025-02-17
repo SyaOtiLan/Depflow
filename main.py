@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog, simpledialog
+from tkinter import filedialog, simpledialog, messagebox
 from collections import defaultdict
 import subprocess
 import threading
@@ -128,7 +128,7 @@ def on_right_click(event):
             if file_path:
                 node_files[node] = file_path
                 node_names[node] = file_path
-                print(f"节点 {node} 关联文件: {file_path}")
+                messagebox.showinfo("关联信息", f"节点 {node} 关联文件: {file_path}")
         elif choice == 2:
             code = simpledialog.askstring("输入代码", "请输入 Python 代码：")
             if code:
@@ -138,18 +138,18 @@ def on_right_click(event):
                     f.write(code)
                 node_files[node] = f.name
                 node_names[node] = f.name
-                print(f"节点 {node} 关联代码文件: {f.name}")
+                messagebox.showinfo("关联信息", f"节点 {node} 关联代码文件: {f.name}")
         elif choice == 3:
             file = node_files.get(node)
             if file:
                 try:
                     with open(file, 'r') as f:
                         code_content = f.read()
-                        print(f"节点 {node} 保存的代码内容:\n{code_content}")
+                        messagebox.showinfo("代码内容", f"节点 {node} 保存的代码内容:\n{code_content}")
                 except Exception as e:
-                    print(f"读取代码文件出错: {e}")
+                    messagebox.showerror("读取错误", f"读取代码文件出错: {e}")
             else:
-                print(f"节点 {node} 没有保存代码。")
+                messagebox.showinfo("无代码", f"节点 {node} 没有保存代码。")
 
 
 # 创建节点函数
